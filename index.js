@@ -12,6 +12,9 @@ import sharp from "sharp";
 import { fileURLToPath } from "url";
 
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 /* ------------------ Vercel Base64 Key Setup ------------------ */
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
@@ -36,8 +39,7 @@ console.log("LOCATION:", process.env.LOCATION);
 console.log("PROCESSOR_ID:", process.env.PROCESSOR_ID);
 
 /* ------------------ Setup ------------------ */
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
