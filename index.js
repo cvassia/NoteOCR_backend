@@ -34,9 +34,6 @@ if (fs.existsSync(envPath)) {
     console.log(".env file not found, using defaults");
 }
 
-console.log("PROJECT_ID:", process.env.PROJECT_ID);
-console.log("LOCATION:", process.env.LOCATION);
-console.log("PROCESSOR_ID:", process.env.PROCESSOR_ID);
 
 /* ------------------ Setup ------------------ */
 
