@@ -6,14 +6,34 @@ import dotenv from "dotenv";
 import 'dotenv/config';
 import express from "express";
 import fs from "fs";
+import mongoose from "mongoose";
 import multer from "multer";
 import path from "path";
 import sharp from "sharp";
 import { fileURLToPath } from "url";
 
 
+/* ------------------ MongoDB Setup ------------------ */
+
+const MONGODB_URI = process.env.MONGODB_URI;
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log("Connected to MongoDB Atlas"))
+    .catch(err => console.error("MongoDB connection error:", err));
+
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const documentSchema = new mongoose.Schema({
+    userId: { type: String, required: true, index: true },
+    name: { type: String, required: true },
+    url: { type: String, required: true },
+    text: { type: String },
+    uploadedAt: { type: Date, default: Date.now }
+});
+
+
+const DocumentModel = mongoose.model("Document", documentSchema);
 
 
 /* ------------------ Vercel Base64 Key Setup ------------------ */
@@ -61,7 +81,6 @@ const projectId = process.env.PROJECT_ID;
 const location = process.env.LOCATION;
 const processorId = process.env.PROCESSOR_ID;
 const SERVER_URL = process.env.SERVER_URL || "http://localhost:3000";
-console.log("projectId:", projectId, "location:", location, "processorId:", processorId);
 
 
 /* ------------------ Document AI client ------------------ */
@@ -154,14 +173,28 @@ app.post("/ocr", upload.single("file"), async (req, res) => {
         const docx = new Document({ sections: [{ children: paragraphs }] });
         const docFileName = `document_${new Date().toLocaleDateString("en-GB").replace(/\//g, '.').slice(0, 8)}.docx`
         const docPath = path.join(uploadDir, docFileName);
+
         const buffer = await Packer.toBuffer(docx);
         fs.writeFileSync(docPath, buffer);
 
-        /* ------------------ Respond with text + DOCX URL ------------------ */
-        res.json({
+        const { userId } = req.body;
+        if (!userId) {
+            return res.status(401).json({ error: "Missing userId" });
+        }
+
+        const newDoc = await DocumentModel.create({
+            name: docFileName,
             text,
-            docxUrl: `${SERVER_URL}/${docFileName}`
+            url: `${SERVER_URL}/${docFileName}`,
+            userId,
         });
+
+        res.status(201).json({
+            text,
+            docxUrl: newDoc.url,
+            document: newDoc,
+        });
+
 
         // Cleanup uploaded/converted images
         fs.unlinkSync(req.file.path);
@@ -178,20 +211,28 @@ app.get("/", (req, res) => res.send("OCR server running"));
 /* ------------------ Documents list endpoint ------------------ */
 
 //Get documents
-app.get("/documents", (req, res) => {
+app.get("/documents", async (req, res) => {
     try {
-        if (!fs.existsSync(uploadDir)) return res.json([]);
+        // if (!fs.existsSync(uploadDir)) return res.json([]);
 
-        const files = fs.readdirSync(uploadDir);
+        // const files = fs.readdirSync(uploadDir);
 
-        const docs = files
-            .filter(file => file.endsWith(".docx")) // only DOCX files
-            .map(file => ({
-                id: file,
-                name: file.replace(/^\d+_/, ""),
-                url: `${SERVER_URL}/${file}`,
-                uploadedAt: fs.statSync(path.join(uploadDir, file)).birthtime,
-            }));
+        // const docs = files
+        //     .filter(file => file.endsWith(".docx")) // only DOCX files
+        //     .map(file => ({
+        //         id: file,
+        //         name: file.replace(/^\d+_/, ""),
+        //         url: `${SERVER_URL}/${file}`,
+        //         uploadedAt: fs.statSync(path.join(uploadDir, file)).birthtime,
+        //     }));
+
+        // res.json(docs);
+        const userId = req.query.userId;
+        if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+        const docs = await DocumentModel
+            .find({ userId })
+            .sort({ uploadedAt: -1 });
 
         res.json(docs);
     } catch (err) {
@@ -201,26 +242,18 @@ app.get("/documents", (req, res) => {
 });
 
 /* ------------------ Rename document ------------------ */
-app.patch("/documents/:id", (req, res) => {
+app.patch("/documents/:id", async (req, res) => {
     try {
-        const { id } = req.params;
-        const { name } = req.body;
+        const { userId, name } = req.body;
 
-        const oldPath = path.join(uploadDir, id);
+        const doc = await DocumentModel.findOneAndUpdate(
+            { _id: req.params.id, userId },
+            { name },
+            { new: true }
+        );
 
-        if (!fs.existsSync(oldPath)) return res.status(404).json({ error: "Document not found" });
-
-        const ext = path.extname(id);
-        const newFileName = `${Date.now()}_${name}${ext}`;
-        const newPath = path.join(uploadDir, newFileName);
-
-        fs.renameSync(oldPath, newPath);
-
-        res.json({
-            id: newFileName,
-            name,
-            url: `${SERVER_URL}/${newFileName}`,
-        });
+        if (!doc) return res.sendStatus(404);
+        res.json(doc);
     } catch (err) {
         console.error("Error renaming document:", err);
         res.status(500).json({ error: "Failed to rename document" });
@@ -228,16 +261,25 @@ app.patch("/documents/:id", (req, res) => {
 });
 
 /* ------------------ Delete document ------------------ */
-app.delete("/documents/:id", (req, res) => {
+app.delete("/documents/:id", async (req, res) => {
     try {
-        const { id } = req.params;
-        const filePath = path.join(uploadDir, id);
+        // const { id } = req.params;
+        // const filePath = path.join(uploadDir, id);
 
-        if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Document not found" });
+        // if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Document not found" });
 
-        fs.unlinkSync(filePath);
+        // fs.unlinkSync(filePath);
 
-        res.json({ success: true });
+        // res.json({ success: true });
+        const { userId } = req.body;
+
+        const doc = await DocumentModel.findOneAndDelete({
+            _id: req.params.id,
+            userId,
+        });
+
+        if (!doc) return res.sendStatus(404);
+        res.sendStatus(200);
     } catch (err) {
         console.error("Error deleting document:", err);
         res.status(500).json({ error: "Failed to delete document" });
