@@ -2,4 +2,6 @@ node_modules/
 uploads/
 vision-key.json
 .env
+.env*
+.env*.local
 *.log

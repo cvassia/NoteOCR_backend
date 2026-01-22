@@ -155,7 +155,7 @@ app.post("/ocr", upload.single("file"), async (req, res) => {
                         text: wordText + " ",
                         bold,
                         italics: italic,
-                        font: "Times New Roman",
+                        font: "Arial",
                         size: 24, // 12pt
                     });
                 });
