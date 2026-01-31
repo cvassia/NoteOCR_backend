@@ -247,7 +247,7 @@ app.patch("/documents/:id", async (req, res) => {
         const { userId, name } = req.body;
 
         const doc = await DocumentModel.findOneAndUpdate(
-            { _id: req.params.id, userId },
+            { id: req.params.id, userId },
             { name },
             { new: true }
         );
@@ -274,7 +274,7 @@ app.delete("/documents/:id", async (req, res) => {
         const { userId } = req.body;
 
         const doc = await DocumentModel.findOneAndDelete({
-            _id: req.params.id,
+            id: req.params.id,
             userId,
         });
 
