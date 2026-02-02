@@ -213,20 +213,6 @@ app.get("/", (req, res) => res.send("OCR server running"));
 //Get documents
 app.get("/documents", async (req, res) => {
     try {
-        // if (!fs.existsSync(uploadDir)) return res.json([]);
-
-        // const files = fs.readdirSync(uploadDir);
-
-        // const docs = files
-        //     .filter(file => file.endsWith(".docx")) // only DOCX files
-        //     .map(file => ({
-        //         id: file,
-        //         name: file.replace(/^\d+_/, ""),
-        //         url: `${SERVER_URL}/${file}`,
-        //         uploadedAt: fs.statSync(path.join(uploadDir, file)).birthtime,
-        //     }));
-
-        // res.json(docs);
         const userId = req.query.userId;
         if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
@@ -263,14 +249,7 @@ app.patch("/documents/:id", async (req, res) => {
 /* ------------------ Delete document ------------------ */
 app.delete("/documents/:id", async (req, res) => {
     try {
-        // const { id } = req.params;
-        // const filePath = path.join(uploadDir, id);
 
-        // if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Document not found" });
-
-        // fs.unlinkSync(filePath);
-
-        // res.json({ success: true });
         const { userId } = req.body;
 
         const doc = await DocumentModel.findOneAndDelete({
@@ -285,6 +264,22 @@ app.delete("/documents/:id", async (req, res) => {
         res.status(500).json({ error: "Failed to delete document" });
     }
 });
+
+/* ------------------ Delete user ------------------ */
+
+app.delete("/users/:id", async (req, res) => {
+    try {
+        const userId = req.params.id;
+
+        await DocumentModel.deleteMany({ userId });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Error deleting user data:", err);
+        res.status(500).json({ error: "Failed to delete user data" });
+    }
+});
+
 
 
 
